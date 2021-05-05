@@ -7,6 +7,8 @@ import io.github.ytg1234.manhunt.base.haveMod
 import io.github.ytg1234.manhunt.command.ClearCacheCommand
 import io.github.ytg1234.manhunt.command.HuntersCommand
 import io.github.ytg1234.manhunt.command.SpeedrunnerCommand
+import net.fabricmc.api.EnvType
+import net.fabricmc.api.Environment
 import net.fabricmc.fabric.api.client.networking.v1.ClientPlayNetworking
 import net.fabricmc.fabric.api.command.v1.CommandRegistrationCallback
 import net.fabricmc.fabric.api.event.lifecycle.v1.ServerTickEvents
@@ -32,7 +34,7 @@ object ManhuntEventRegistration {
         UseItemCallback.EVENT.register(ManhuntInteractions::pointCompass)
 
         ServerPlayNetworking.registerGlobalReceiver(CLIENT_ANSWER_PACKET_ID) { server, player, _, _, _ ->
-            server.execute { if (!haveMod.contains(player)) haveMod.add(player) }
+            server.execute { if (player !in server.haveMod) server.haveMod.add(player) }
         }
     }
 
@@ -48,6 +50,7 @@ object ManhuntEventRegistration {
     /**
      * Registers client-only events.
      */
+    @Environment(EnvType.CLIENT)
     fun registerClientSideEvents() {
         ClientPlayNetworking.registerGlobalReceiver(
             SERVER_QUESTION_PACKET_ID

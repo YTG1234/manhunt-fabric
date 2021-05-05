@@ -3,6 +3,10 @@ package io.github.ytg1234.manhunt.base
 import com.mojang.brigadier.context.CommandContext
 import io.github.ytg1234.manhunt.api.event.callback.CompassUpdateCallback
 import io.github.ytg1234.manhunt.config.ManhuntConfig
+import io.github.ytg1234.manhunt.util.ManhuntServer
+import me.sargunvohra.mcmods.autoconfig1u.AutoConfig
+import me.sargunvohra.mcmods.autoconfig1u.serializer.JanksonConfigSerializer
+import net.minecraft.entity.Entity
 import net.minecraft.entity.LivingEntity
 import net.minecraft.entity.effect.StatusEffect
 import net.minecraft.entity.effect.StatusEffectInstance
@@ -28,12 +32,6 @@ const val MOD_ID = "manhunt"
 const val MOD_NAME = "Manhunt Fabric"
 
 /**
- * Contains all the currently active hunters.
- */
-@JvmField
-val hunters: MutableList<UUID> = mutableListOf()
-
-/**
  * Contains the [Identifier] of the question packet.
  */
 @JvmField
@@ -46,29 +44,20 @@ val SERVER_QUESTION_PACKET_ID: Identifier = Identifier(MOD_ID, "question")
 val CLIENT_ANSWER_PACKET_ID: Identifier = Identifier(MOD_ID, "answer")
 
 /**
- * Contains every [player][PlayerEntity] that has the mod
- * on their client.
- */
-@JvmField
-val haveMod: MutableList<PlayerEntity> = mutableListOf()
-
-/**
  * Manhunt's [Log4j logger][org.apache.logging.log4j.Logger]
  */
 @JvmField
 val LOGGER = LogManager.getLogger(MOD_NAME)!!
 
 /**
- * Contains the currently active speedrunner.
- */
-@JvmField
-var speedrunner: UUID? = null
-
-/**
  * The one and only Manhunt configuration.
  */
 @JvmField
-var CONFIG: ManhuntConfig? = null
+val CONFIG: ManhuntConfig = run {
+    LOGGER.info("Registering Manhunt Config")
+    AutoConfig.register(ManhuntConfig::class.java, ::JanksonConfigSerializer)
+    AutoConfig.getConfigHolder(ManhuntConfig::class.java).config
+}
 
 /**
  * Checks if a player has the Manhunt mod on the client side.
@@ -79,9 +68,10 @@ var CONFIG: ManhuntConfig? = null
  */
 @Contract(pure = true)
 fun playerHasMod(context: CommandContext<ServerCommandSource>): Boolean {
-    return context.source.entity != null &&
-            context.source.entity is PlayerEntity &&
-            haveMod.contains(context.source.player)
+    val source = context.source
+    return source.entity != null &&
+            source.entity is PlayerEntity &&
+            source.player in source.minecraftServer.haveMod
 }
 
 /**
@@ -128,7 +118,7 @@ fun updateCompass(compass: ItemStack, target: ServerPlayerEntity?): ItemStack {
         return compass.copy()
     }
     // Is dimension disabled?
-    if (CONFIG!!.disabledDimensions.contains(target.serverWorld.registryKey.value.toString())) return compass.copy()
+    if (CONFIG.disabledDimensions.contains(target.serverWorld.registryKey.value.toString())) return compass.copy()
 
     // Continue Updating
     val oldCompass = compass.copy()
@@ -160,3 +150,16 @@ fun updateCompass(compass: ItemStack, target: ServerPlayerEntity?): ItemStack {
 fun applyStatusEffectToPlayer(player: PlayerEntity, effect: StatusEffect?): Boolean {
     return player.addStatusEffect(StatusEffectInstance(effect, 2, 0, false, false))
 }
+
+val Entity.isHunter : Boolean
+        get(){
+            return this.uuid in ((this.server ?: return false) as ManhuntServer).hunters
+        }
+
+var MinecraftServer.speedRunner : UUID?
+        get() = (this as ManhuntServer).speedRunner
+        set(value) { (this as ManhuntServer).speedRunner = value }
+val MinecraftServer.hunters : MutableList<UUID>
+        get() = (this as ManhuntServer).hunters
+val MinecraftServer.haveMod : MutableList<PlayerEntity>
+        get() = (this as ManhuntServer).haveMod
